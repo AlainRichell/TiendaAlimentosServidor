@@ -37,7 +37,6 @@ class Producto(models.Model):
         return self.nombre
 
     def delete(self, *args, **kwargs):
-        # Elimina todas las imágenes asociadas cuando se elimina el producto
         for imagen in self.imagenes.all():
             imagen.delete()
         super().delete(*args, **kwargs)
@@ -52,7 +51,6 @@ class Imagen(models.Model):
         return f"Imagen de {self.idproducto.nombre}"
 
     def delete(self, *args, **kwargs):
-        # Borra el archivo de la imagen cuando se elimine la instancia de Imagen
         if self.imagen:
             if os.path.isfile(self.imagen.path):
                 os.remove(self.imagen.path)
@@ -60,9 +58,6 @@ class Imagen(models.Model):
 
 @receiver(models.signals.post_delete, sender=Imagen)
 def auto_delete_file_on_delete(sender, instance, **kwargs):
-    """
-    Borra el archivo del sistema cuando se elimina una instancia de Imagen.
-    """
     if instance.imagen:
         if os.path.isfile(instance.imagen.path):
             os.remove(instance.imagen.path)
@@ -77,7 +72,6 @@ class ImagenCategoria(models.Model):
         return f"Imagen de {self.idcategoria.categoria}"
 
     def delete(self, *args, **kwargs):
-        # Borra el archivo de la imagen cuando se elimine la instancia de Imagen
         if self.imagen:
             if os.path.isfile(self.imagen.path):
                 os.remove(self.imagen.path)
@@ -85,9 +79,6 @@ class ImagenCategoria(models.Model):
 
 @receiver(models.signals.post_delete, sender=ImagenCategoria)
 def auto_delete_file_on_delete(sender, instance, **kwargs):
-    """
-    Borra el archivo del sistema cuando se elimina una instancia de Imagen.
-    """
     if instance.imagen:
         if os.path.isfile(instance.imagen.path):
             os.remove(instance.imagen.path)

@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from .models import Categoria, Producto, Imagen, ImagenCategoria, Profile, User, Pedido, TipoPedido, PedidoProducto, Transaccion, TipoTransaccion
 
+################################# ADICIONALES USUARIO CLIENTE #######################################
+
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
@@ -26,15 +28,21 @@ class UserSerializer(serializers.ModelSerializer):
 
         return instance
 
+#################################### IMAGEN DE PRODUCTO ##############################################
+
 class ImagenSerializer(serializers.ModelSerializer):
     class Meta:
         model = Imagen
         fields = ['idproducto', 'imagen']
 
+################################### IMAGEN DE CATEGORIA ############################################
+
 class ImagenCategoriaSerializer(serializers.ModelSerializer):
     class Meta:
         model = ImagenCategoria
         fields = ['idcategoria', 'imagen']
+
+######################################## CATEGORIA ####################################################
 
 class CategoriaSerializer(serializers.ModelSerializer):
     imagenes = ImagenCategoriaSerializer(many=True, read_only=True)
@@ -42,6 +50,7 @@ class CategoriaSerializer(serializers.ModelSerializer):
         model = Categoria
         fields = ['idcategoria', 'categoria', 'imagenes']
         
+########################################### PRODUCTO #################################################
 
 class ProductoSerializer(serializers.ModelSerializer):
     categorias = CategoriaSerializer(many=True)
@@ -85,23 +94,28 @@ class ProductoSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
-# Serializer para el modelo TipoPedido
+################################## TIPO O ESTADO DE PEDIDO ############################################
+
 class TipoPedidoSerializer(serializers.ModelSerializer):
     class Meta:
         model = TipoPedido
         fields = ['idtipopedido', 'tipopedido']
 
+################################ RELACION DE PRODUCTOS DE UN PEDIDO #####################################
+
 class PedidoProductoSerializer(serializers.ModelSerializer):
-    producto = serializers.StringRelatedField()  # Muestra el nombre del producto
+    producto = serializers.StringRelatedField()
     producto_id = serializers.PrimaryKeyRelatedField(queryset=Producto.objects.all(), source='producto')
 
     class Meta:
         model = PedidoProducto
         fields = ['producto_id', 'producto', 'cantidad']
 
+########################################### PEDIDO ####################################################
+
 class PedidoSerializer(serializers.ModelSerializer):
-    idusuario = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())  # Relación con User
-    idtipopedido = serializers.PrimaryKeyRelatedField(queryset=TipoPedido.objects.all())  # Relación con TipoPedido
+    idusuario = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    idtipopedido = serializers.PrimaryKeyRelatedField(queryset=TipoPedido.objects.all())
     pedido_productos = serializers.SerializerMethodField()
     transacciones = serializers.PrimaryKeyRelatedField(queryset=Transaccion.objects.all(), many=True)
 
@@ -152,6 +166,8 @@ class PedidoSerializer(serializers.ModelSerializer):
             instance.transacciones.add(transaccion)
 
         return instance
+
+########################################### TRANSACCION ##############################################
 
 class TransaccionSerializer(serializers.ModelSerializer):
     idusuario = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())

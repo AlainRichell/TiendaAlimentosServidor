@@ -33,30 +33,6 @@ class ProductoAdminForm(forms.ModelForm):
             'categorias': forms.SelectMultiple(),  # Cambia el widget a SelectMultiple
         }
 
-@admin.register(Categoria)
-class CategoriaAdmin(admin.ModelAdmin):
-    list_display = ('categoria',)
-    search_fields = ('categoria',)
-    inlines = [ImagenCategoriaInline]
-
-@admin.register(Producto)
-class ProductoAdmin(admin.ModelAdmin):
-    form = ProductoAdminForm  # Usamos el nuevo formulario personalizado
-    list_display = ('nombre', 'precio', 'cantidad',)
-    search_fields = ('nombre', 'descripcion')
-    list_filter = ('categorias',)
-    inlines = [ImagenInline]
-    # Ya no es necesario usar filter_horizontal
-
-#@admin.register(TipoPedido)
-#class TipoPedidoAdmin(admin.ModelAdmin):
-#    list_display = ('tipopedido',)
-#    search_fields = ('tipopedido',)
-#
-#@admin.register(TipoTransaccion)
-#class TipoTransaccionAdmin(admin.ModelAdmin):
-#    list_display = ('tipotransaccion',)
-
 class PedidoProductoInline(admin.TabularInline):
     model = PedidoProducto
     extra = 1  # Número de filas adicionales vacías
@@ -80,28 +56,36 @@ class PedidoProductoInline(admin.TabularInline):
                 )
 
     def save_related(self, request, form, formsets, change):
-        """
-        Sobrescribir save_related para manejar productos directamente.
-        """
         super().save_related(request, form, formsets, change)
         pedido = form.instance
         for formset in formsets:
             if isinstance(formset.model, PedidoProducto):
                 self.save_new_objects(pedido, formset)
 
+@admin.register(Categoria)
+class CategoriaAdmin(admin.ModelAdmin):
+    list_display = ('categoria',)
+    search_fields = ('categoria',)
+    inlines = [ImagenCategoriaInline]
+
+@admin.register(Producto)
+class ProductoAdmin(admin.ModelAdmin):
+    form = ProductoAdminForm
+    list_display = ('nombre', 'precio', 'cantidad',)
+    search_fields = ('nombre', 'descripcion')
+    list_filter = ('categorias',)
+    inlines = [ImagenInline]
+
 @admin.register(Pedido)
 class PedidoAdmin(admin.ModelAdmin):
-    list_display = ('idusuario', 'idtipopedido', 'fecha')  # Cambiado de 'idusuario' a 'usuario'
-    search_fields = ('idusuario__username',)  # Permite buscar por el nombre del usuario
+    list_display = ('idusuario', 'idtipopedido', 'fecha')
+    search_fields = ('idusuario__username',)
     list_filter = ('idtipopedido', 'fecha')
     date_hierarchy = 'fecha'
     exclude = ('transacciones',)
-    inlines = [PedidoProductoInline, TransaccionInline]  # Incluye la nueva configuración del inline
+    inlines = [PedidoProductoInline, TransaccionInline]
 
     def save_related(self, request, form, formsets, change):
-        """
-        Evita duplicar lógica en caso de personalización adicional.
-        """
         super().save_related(request, form, formsets, change)
 
 @admin.register(Transaccion)

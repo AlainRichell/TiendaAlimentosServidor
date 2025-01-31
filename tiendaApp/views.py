@@ -16,12 +16,12 @@ from rest_framework.decorators import action
 class LoginView(APIView):
     def post(self, request):
         data = request.data
-        user = authenticate(username=data['email'], password=data['password'])  # Valida credenciales
+        user = authenticate(username=data['email'], password=data['password'])
         if user:
-            token, created = Token.objects.get_or_create(user=user)  # Genera o obtiene el token
+            token, created = Token.objects.get_or_create(user=user)
             return Response({
                 "token": token.key,
-                "user_id": user.id  # Incluye el ID del usuario
+                "user_id": user.id
             })
         return Response({"error": "Credenciales inválidas"}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -30,7 +30,7 @@ class LoginView(APIView):
 class UserDetailView(APIView):
     def get(self, request, user_id):
         try:
-            user = User.objects.get(id=user_id)  # Busca al usuario por ID
+            user = User.objects.get(id=user_id)
             serializer = UserSerializer(user)
             return Response(serializer.data)
         except User.DoesNotExist:
@@ -38,7 +38,7 @@ class UserDetailView(APIView):
 
     def put(self, request, user_id):
         try:
-            user = User.objects.get(id=user_id)  # Busca al usuario por ID
+            user = User.objects.get(id=user_id)
             serializer = UserSerializer(user, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -52,12 +52,11 @@ class UserDetailView(APIView):
 class UserPasswordUpdateView(APIView):
     def put(self, request, user_id):
         try:
-            user = User.objects.get(id=user_id)  # Busca al usuario por ID
+            user = User.objects.get(id=user_id)
             new_password = request.data.get("new_password")
             if not new_password:
                 return Response({"error": "La nueva contraseña es requerida."}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Actualizar la contraseña usando `make_password`
+            
             user.password = make_password(new_password)
             user.save()
             return Response({"message": "Contraseña actualizada con éxito."}, status=status.HTTP_200_OK)
@@ -70,7 +69,6 @@ class RegisterView(APIView):
     def post(self, request):
         data = request.data
         try:
-            # Crear usuario
             user = User.objects.create_user(
                 username=data['email'],  # Usa el email como username
                 email=data['email'],
