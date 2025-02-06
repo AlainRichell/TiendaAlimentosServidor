@@ -3,6 +3,8 @@ import os
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
+from django.db import transaction
+from django.forms import ValidationError
 
 ################################# ADICIONALES USUARIO CLIENTE #######################################
 
@@ -32,6 +34,7 @@ class Producto(models.Model):
     descripcion = models.CharField(max_length=255, null=True, blank=True)
     precio = models.FloatField()
     cantidad = models.IntegerField()
+    disponible = models.IntegerField(default=0)
 
     def __str__(self):
         return self.nombre
@@ -40,6 +43,46 @@ class Producto(models.Model):
         for imagen in self.imagenes.all():
             imagen.delete()
         super().delete(*args, **kwargs)
+    
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            self.disponible = self.cantidad
+        super().save(*args, **kwargs)
+    
+    def clean(self):
+        if self.disponible > self.cantidad:
+            raise ValidationError({
+                'disponible': 'No puede haber más stock disponible que la cantidad física'
+            })
+
+    @classmethod
+    def reservar_stock(cls, producto_id: int, cantidad: int) -> bool:
+        with transaction.atomic():
+            producto = cls.objects.select_for_update().get(idproducto=producto_id)
+            if producto.disponible >= cantidad:
+                producto.disponible -= cantidad
+                producto.save()
+                return True
+            return False
+    
+    @classmethod
+    def liberar_stock(cls, producto_id: int, cantidad: int) -> None:
+        with transaction.atomic():
+            producto = cls.objects.select_for_update().get(idproducto=producto_id)
+            producto.disponible += cantidad
+            producto.save()
+
+    @classmethod
+    def confirmar_compra(cls, producto_id: int, cantidad: int) -> bool:
+        with transaction.atomic():
+            producto = cls.objects.select_for_update().get(idproducto=producto_id)
+            
+            if producto.cantidad < cantidad:
+                return False
+                
+            producto.cantidad -= cantidad
+            producto.save()
+            return True
 
 #################################### IMAGEN DE PRODUCTO ##############################################
 

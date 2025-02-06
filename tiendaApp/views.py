@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from .models import Categoria, Producto, Imagen, ImagenCategoria, Pedido, TipoPedido
 from .serializers import CategoriaSerializer, ProductoSerializer, ImagenSerializer, ImagenCategoriaSerializer, UserSerializer, PedidoSerializer, TipoPedidoSerializer, Transaccion
+from .serializers import TransaccionSerializer
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 from rest_framework.views import APIView
@@ -10,6 +11,8 @@ from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
+from rest_framework.decorators import api_view
+from django.db import transaction
 
 ###################################### LOGIN #########################################################
 
@@ -117,6 +120,85 @@ class ProductoViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         serializer.save()
+    
+@api_view(['POST'])
+def reservar_productos(request):
+    items = request.data.get('items', [])
+    
+    for item in items:
+        success = Producto.reservar_stock(
+            producto_id=item['producto_id'],
+            cantidad=item['cantidad']
+        )
+        if not success:
+            # Si falla, libera las reservas previas
+            for rollback_item in items[:items.index(item)]:
+                Producto.liberar_stock(
+                    producto_id=rollback_item['producto_id'],
+                    cantidad=rollback_item['cantidad']
+                )
+            return Response(
+                {'error': 'Stock insuficiente para el producto ID: {}'.format(item['producto_id'])},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    return Response({'status': 'Reserva exitosa'})
+
+@api_view(['POST'])
+def confirmar_compra(request):
+    try:
+        items = request.data.get('items', [])
+        
+        # Validar estructura de los items
+        for item in items:
+            if 'producto_id' not in item or 'cantidad' not in item:
+                return Response(
+                    {'error': 'Formato de item inválido. Se requieren "producto_id" y "cantidad"'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        with transaction.atomic():
+            for item in items:
+                producto = Producto.objects.select_for_update().get(idproducto=item['producto_id'])
+                if not producto.confirmar_compra(item['producto_id'], item['cantidad']):
+                    return Response(
+                        {'error': f'Error confirmando compra para producto {item["producto_id"]}'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            return Response({'status': 'Compra confirmada'})
+
+    except Producto.DoesNotExist:
+        return Response({'error': 'Producto no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    except KeyError as e:
+        return Response({'error': f'Campo faltante: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+def cancelar_reserva(request):
+    try:
+        items = request.data.get('items', [])
+        
+        # Validar estructura de los items
+        for item in items:
+            if 'idproducto' not in item or 'cantidad' not in item:
+                return Response(
+                    {'error': 'Formato de item inválido. Se requieren "idproducto" y "cantidad"'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        with transaction.atomic():
+            for item in items:
+                Producto.liberar_stock(
+                    producto_id=item['idproducto'],
+                    cantidad=item['cantidad']
+                )
+            
+            return Response({'status': 'Reservas liberadas'})
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 #################################### IMAGENES DE PRODUCTOS #########################################
 
@@ -141,7 +223,17 @@ class TipoPedidoViewSet(viewsets.ModelViewSet):
 class PedidoViewSet(viewsets.ViewSet):
     def list(self, request, user_id=None):
         user = get_object_or_404(User, id=user_id)
-        pedidos = Pedido.objects.filter(idusuario=user)
+        pedidos = Pedido.objects.filter(idusuario=user)\
+            .prefetch_related('pedido_productos__producto', 'transacciones')\
+            .order_by('-idpedido')  # Orden descendente por ID de pedido
+
+        # Si se solicita expansión de relaciones
+        expand = request.query_params.get('expand', '')
+        if 'productos' in expand:
+            pedidos = pedidos.prefetch_related('pedido_productos__producto')
+        if 'transacciones' in expand:
+            pedidos = pedidos.prefetch_related('transacciones')
+            
         serializer = PedidoSerializer(pedidos, many=True)
         return Response(serializer.data)
 
@@ -153,10 +245,20 @@ class PedidoViewSet(viewsets.ViewSet):
 
     def create(self, request, user_id=None):
         user = get_object_or_404(User, id=user_id)
+        
+        # Añadir validación manual de productos
+        if 'productos' not in request.data or not isinstance(request.data['productos'], list):
+            return Response(
+                {'productos': ['Este campo es requerido.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         serializer = PedidoSerializer(data=request.data)
+        
         if serializer.is_valid():
             serializer.save(idusuario=user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, pk=None, user_id=None):
@@ -190,4 +292,4 @@ class PedidoViewSet(viewsets.ViewSet):
 
 class TransaccionViewSet(viewsets.ModelViewSet):
     queryset = Transaccion.objects.all()
-    serializer_class = 'TransaccionSerializer'
+    serializer_class = TransaccionSerializer

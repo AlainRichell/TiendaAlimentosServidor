@@ -104,68 +104,55 @@ class TipoPedidoSerializer(serializers.ModelSerializer):
 ################################ RELACION DE PRODUCTOS DE UN PEDIDO #####################################
 
 class PedidoProductoSerializer(serializers.ModelSerializer):
-    producto = serializers.StringRelatedField()
-    producto_id = serializers.PrimaryKeyRelatedField(queryset=Producto.objects.all(), source='producto')
+    producto_nombre = serializers.CharField(source='producto.nombre', read_only=True)
+    producto_id = serializers.PrimaryKeyRelatedField(
+        queryset=Producto.objects.all(),
+        source='producto',  # Mapear producto_id al campo producto
+        write_only=True  # Solo para escritura
+    )
 
     class Meta:
         model = PedidoProducto
-        fields = ['producto_id', 'producto', 'cantidad']
+        fields = ['producto_id', 'producto_nombre', 'cantidad']
 
 ########################################### PEDIDO ####################################################
 
 class PedidoSerializer(serializers.ModelSerializer):
     idusuario = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     idtipopedido = serializers.PrimaryKeyRelatedField(queryset=TipoPedido.objects.all())
-    pedido_productos = serializers.SerializerMethodField()
+    productos = PedidoProductoSerializer(
+        many=True,
+        source='pedido_productos',
+        required=True  # Hacer el campo obligatorio
+    )
     transacciones = serializers.PrimaryKeyRelatedField(queryset=Transaccion.objects.all(), many=True)
 
     class Meta:
         model = Pedido
-        fields = ['idpedido', 'idusuario', 'pedido_productos', 'idtipopedido', 'fecha', 'transacciones']
-
-    def get_pedido_productos(self, obj):
-        return PedidoProductoSerializer(obj.pedido_productos.all(), many=True).data
+        fields = ['idpedido', 'idusuario', 'idtipopedido', 'fecha', 'productos', 'transacciones']
 
     def create(self, validated_data):
-        pedido_productos_data = validated_data.pop('pedido_productos', [])
+        productos_data = validated_data.pop('pedido_productos')
         transacciones_data = validated_data.pop('transacciones', [])
-        tipo_pedido = validated_data.pop('idtipopedido')
-
-        pedido = Pedido.objects.create(**validated_data, idtipopedido=tipo_pedido)
-
-        for pedido_producto_data in pedido_productos_data:
-            producto = pedido_producto_data['producto']
-            cantidad = pedido_producto_data['cantidad']
-            PedidoProducto.objects.create(pedido=pedido, producto=producto, cantidad=cantidad)
-
-        for transaccion in transacciones_data:
-            pedido.transacciones.add(transaccion)
-
+        
+        pedido = Pedido.objects.create(**validated_data)
+        
+        # Crear relaciones de productos
+        for producto_data in productos_data:
+            PedidoProducto.objects.create(
+                pedido=pedido,
+                producto=producto_data['producto'],  # Usar el objeto Producto
+                cantidad=producto_data['cantidad']
+            )
+        
+        # Agregar transacciones
+        pedido.transacciones.set(transacciones_data)
+        
         return pedido
 
-    def update(self, instance, validated_data):
-        pedido_productos_data = validated_data.pop('pedido_productos', [])
-        transacciones_data = validated_data.pop('transacciones', [])
-        tipo_pedido = validated_data.pop('idtipopedido', None)
-
-        if tipo_pedido:
-            instance.idtipopedido = tipo_pedido
-
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-
-        instance.pedido_productos.all().delete()
-        for pedido_producto_data in pedido_productos_data:
-            producto = pedido_producto_data['producto']
-            cantidad = pedido_producto_data['cantidad']
-            PedidoProducto.objects.create(pedido=instance, producto=producto, cantidad=cantidad)
-
-        instance.transacciones.clear()
-        for transaccion in transacciones_data:
-            instance.transacciones.add(transaccion)
-
-        return instance
+    def get_productos(self, obj):
+        productos = obj.pedido_productos.all()
+        return PedidoProductoSerializer(productos, many=True).data
 
 ########################################### TRANSACCION ##############################################
 

@@ -10,7 +10,10 @@ from .views import (
     UserPasswordUpdateView, 
     TipoPedidoViewSet, 
     PedidoViewSet,
-    TransaccionViewSet
+    TransaccionViewSet,
+    reservar_productos,  # Nueva vista
+    confirmar_compra,     # Nueva vista
+    cancelar_reserva
 )
 
 router = DefaultRouter()
@@ -48,4 +51,8 @@ urlpatterns = [
     # Rutas generales de pedidos (opcional, para administración o accesos sin filtro de usuario)
     path('pedidos/', pedido_list, name='pedido-list'),
     path('pedidos/<int:pk>/', pedido_detail, name='pedido-detail'),
+    # Nuevas rutas para gestión de reservas y compras
+    path('reservas/reservar/', reservar_productos, name='reservar-productos'),
+    path('reservas/confirmar/', confirmar_compra, name='confirmar-compra'),
+    path('reservas/cancelar/', cancelar_reserva, name='cancelar-reserva'),
 ]
