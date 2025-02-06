@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Factura #{{ pedido.numero }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2cm; }
+        .header { border-bottom: 2px solid #000; margin-bottom: 20px; }
+        .business-info { float: left; width: 60%; }
+        .invoice-info { float: right; text-align: right; }
+        .clear { clear: both; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f5f5f5; }
+        .total { font-weight: bold; text-align: right; }
+        .footer { margin-top: 50px; font-size: 0.8em; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="business-info">
+            <h2>{{ business.nombre }}</h2>
+            <p>{{ business.direccion }}</p>
+            <p>RUC: {{ business.ruc }}</p>
+        </div>
+        <div class="invoice-info">
+            <h2>FACTURA #{{ pedido.numero }}</h2>
+            <p>Fecha: {{ pedido.fecha }}</p>
+            <p>Estado: {{ pedido.estado }}</p>
+        </div>
+        <div class="clear"></div>
+    </div>
+
+    <div class="client-info">
+        <h3>Datos del Cliente</h3>
+        <p>Nombre: {{ cliente.nombre }}</p>
+        <p>Dirección: {{ cliente.direccion }}</p>
+        <p>Teléfono: {{ cliente.telefono }}</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>P. Unitario</th>
+                <th>Importe</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for producto in productos %}
+            <tr>
+                <td>{{ producto.nombre }}</td>
+                <td>{{ producto.cantidad }}</td>
+                <td>{{ producto.precio_unitario|floatformat:2 }} {{ pago.moneda }}</td>
+                <td>{{ producto.subtotal|floatformat:2 }} {{ pago.moneda }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="total">
+        <p>Total: {{ pago.total|floatformat:2 }} {{ pago.moneda }}</p>
+    </div>
+
+    <div class="payment-info">
+        <h3>Información de Pago</h3>
+        <p>Método: {{ pago.tipo }}</p>
+        <p>Referencia: {{ pago.referencia }}</p>
+    </div>
+
+    <div class="footer">
+        <p>Este documento es una factura electrónica válida según normativa vigente</p>
+        <p>{{ business.nombre }} - Todos los derechos reservados</p>
+    </div>
+</body>
+</html>

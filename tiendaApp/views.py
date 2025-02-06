@@ -13,6 +13,9 @@ from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
 from rest_framework.decorators import api_view
 from django.db import transaction
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from xhtml2pdf import pisa
 
 ###################################### LOGIN #########################################################
 
@@ -287,6 +290,79 @@ class PedidoViewSet(viewsets.ViewSet):
 
         serializer = PedidoSerializer(pedido)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+@api_view(['GET'])
+def generate_factura_pdf(request, pedido_id):
+    # Obtener el pedido con todas las relaciones necesarias
+    pedido = get_object_or_404(
+        Pedido.objects.select_related('idusuario', 'idtipopedido')
+                    .prefetch_related('pedido_productos__producto', 'transacciones'),
+        idpedido=pedido_id
+    )
+    
+    user = pedido.idusuario
+    profile = user.profile  # Asume relación OneToOne con Profile
+    
+    # Datos del negocio (deberías crear un modelo para esto)
+    business_name = "Gustare S.R.L."  # Ejemplo
+    business_address = "Av. Principal 123, Ciudad"
+    business_tax_id = "RUC-123456789001"
+    
+    # Calcular detalles de productos
+    productos = []
+    total_productos = 0
+    for pp in pedido.pedido_productos.all():
+        producto = pp.producto
+        subtotal = pp.cantidad * producto.precio
+        total_productos += subtotal
+        productos.append({
+            'nombre': producto.nombre,
+            'cantidad': pp.cantidad,
+            'precio_unitario': producto.precio,
+            'subtotal': subtotal,
+        })
+    
+    # Obtener datos de transacción
+    transaccion = pedido.transacciones.first()
+    payment_data = {
+        'tipo': transaccion.idtipotransaccion.tipotransaccion if transaccion else "No especificado",
+        'referencia': transaccion.codigoreferencia if transaccion else "N/A",
+        'total': transaccion.monto if transaccion else total_productos,
+        'moneda': transaccion.moneda if transaccion else "USD"
+    }
+    
+    # Contexto para la plantilla
+    context = {
+        'business': {
+            'nombre': business_name,
+            'direccion': business_address,
+            'ruc': business_tax_id
+        },
+        'cliente': {
+            'nombre': user.get_full_name(),
+            'direccion': profile.address,
+            'telefono': profile.phone
+        },
+        'pedido': {
+            'numero': pedido.idpedido,
+            'fecha': pedido.fecha.strftime("%d/%m/%Y"),
+            'estado': pedido.idtipopedido.tipopedido
+        },
+        'productos': productos,
+        'pago': payment_data
+    }
+    
+    # Renderizar HTML a PDF
+    html_string = render_to_string('factura_template.html', context)
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="factura_{pedido.idpedido}.pdf"'
+    
+    # Generar PDF
+    pisa_status = pisa.CreatePDF(html_string, dest=response)
+    if pisa_status.err:
+        return HttpResponse('Error al generar PDF', status=500)
+    
+    return response
 
 ####################################### TRANSACCIONES #############################################
 

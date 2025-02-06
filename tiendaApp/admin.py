@@ -71,7 +71,7 @@ class CategoriaAdmin(admin.ModelAdmin):
 @admin.register(Producto)
 class ProductoAdmin(admin.ModelAdmin):
     form = ProductoAdminForm
-    list_display = ('nombre', 'precio', 'cantidad',)
+    list_display = ('nombre', 'cantidad',)
     search_fields = ('nombre', 'descripcion')
     list_filter = ('categorias',)
     inlines = [ImagenInline]

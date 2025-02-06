@@ -13,7 +13,8 @@ from .views import (
     TransaccionViewSet,
     reservar_productos,  # Nueva vista
     confirmar_compra,     # Nueva vista
-    cancelar_reserva
+    cancelar_reserva,
+    generate_factura_pdf
 )
 
 router = DefaultRouter()
@@ -51,6 +52,7 @@ urlpatterns = [
     # Rutas generales de pedidos (opcional, para administración o accesos sin filtro de usuario)
     path('pedidos/', pedido_list, name='pedido-list'),
     path('pedidos/<int:pk>/', pedido_detail, name='pedido-detail'),
+    path('pedidos/<int:pedido_id>/generate-factura/', generate_factura_pdf, name='generate-factura'),
     # Nuevas rutas para gestión de reservas y compras
     path('reservas/reservar/', reservar_productos, name='reservar-productos'),
     path('reservas/confirmar/', confirmar_compra, name='confirmar-compra'),
